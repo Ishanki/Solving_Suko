@@ -8,3 +8,5 @@ http://feeds.thetimes.co.uk/puzzles/public/suko/20210508/863403/ <br/>
 https://puzzlemadness.co.uk/suko/medium
 
 <img src="/Suko_image.jpg" alt="Suko example grid"/>
+
+Code dependencies: Pyomo, GLPK solver.
