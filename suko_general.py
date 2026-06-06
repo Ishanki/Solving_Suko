@@ -89,13 +89,13 @@ class Suko:
         # solver=SolverFactory('gams')
         # results = solver.solve(m, tee=True, solver = 'cplex')
         
-        solver=SolverFactory('glpk')
+        solver=SolverFactory('glpk', executable='/opt/homebrew/bin/glpsol')
         results = solver.solve(m, tee=True)
         
         # Storing and printing solutions
         answers = []
         for k, v in m.x.items():
-            if v == 1:
+            if value(v) == 1:
                 answers.append(k[2])
                 
         # print(answers)
@@ -107,15 +107,111 @@ class Suko:
         """
         print("\nThe solution is: "+grid)
    
-             
-# INPUTS
-colour_1_cells = [(1,1),(2,1),(3,1)]
-colour_2_cells = [(1,2),(1,3),(2,3)]
-colour_3_cells = [(2,2),(3,2),(3,3)]
-colour_sums = [11, 11, 23]  # sums for each colour
-quadrant_sums = [19, 17, 21, 26]  # left to right, sums for each quadrant
 
-# Creating Suko object and running the optimisation model to get results
-suko = Suko(colour_1_cells, colour_2_cells, colour_3_cells, colour_sums,
-            quadrant_sums)
+def print_grid(colour_map):
+    """Print the 3x3 grid with colour labels for assigned cells."""
+    symbols = {1: 'A', 2: 'B', 3: 'C'}
+    cell_label = {}
+    for colour, cells in colour_map.items():
+        for cell in cells:
+            cell_label[cell] = symbols[colour]
+
+    print()
+    for r in range(1, 4):
+        row = ""
+        for c in range(1, 4):
+            label = cell_label.get((r, c), ' ')
+            row += f"[({r},{c})={label}]  "
+        print("  " + row)
+    print()
+
+
+def print_quadrant_diagram():
+    print("""
+  Quadrant layout (each quadrant is a 2x2 block):
+
+    Q1: (1,1)(1,2)    Q2: (1,2)(1,3)
+        (2,1)(2,2)        (2,2)(2,3)
+
+    Q3: (2,1)(2,2)    Q4: (2,2)(2,3)
+        (3,1)(3,2)        (3,2)(3,3)
+
+  Enter sums left-to-right: Q1, Q2, Q3, Q4
+""")
+
+
+def parse_cells(raw):
+    """Parse a string like '(1,1),(2,3),(3,2)' into a list of tuples."""
+    import re
+    pairs = re.findall(r'\((\d)\s*,\s*(\d)\)', raw)
+    if not pairs:
+        raise ValueError("No valid cell tuples found. Use format: (row,col),(row,col),...")
+    cells = [(int(r), int(c)) for r, c in pairs]
+    for r, c in cells:
+        if r not in (1, 2, 3) or c not in (1, 2, 3):
+            raise ValueError(f"Cell ({r},{c}) is out of range — rows and columns must be 1, 2, or 3.")
+    return cells
+
+
+def get_inputs():
+    print("\n=== SUKO PUZZLE SOLVER ===")
+    print("\nThe grid uses (row, col) coordinates, rows and columns numbered 1–3 top-to-bottom, left-to-right.")
+    print("\nStep 1: Assign each of the 9 cells to one of 3 colours (A, B, C).")
+    print("        All 9 cells must be covered with no overlaps.\n")
+
+    colour_map = {}
+    all_assigned = set()
+
+    for i, label in enumerate(['A', 'B', 'C'], start=1):
+        while True:
+            try:
+                print_grid(colour_map)
+                raw = input(f"  Enter cells for colour {label} (e.g. (1,1),(2,1),(3,1)): ").strip()
+                cells = parse_cells(raw)
+                overlap = all_assigned & set(cells)
+                if overlap:
+                    print(f"  Error: cells {sorted(overlap)} are already assigned to another colour.\n")
+                    continue
+                colour_map[i] = cells
+                all_assigned |= set(cells)
+                break
+            except ValueError as e:
+                print(f"  Error: {e}\n")
+
+    if all_assigned != {(r, c) for r in range(1, 4) for c in range(1, 4)}:
+        missing = {(r, c) for r in range(1, 4) for c in range(1, 4)} - all_assigned
+        print(f"\n  Warning: cells {sorted(missing)} were not assigned to any colour.")
+
+    print_grid(colour_map)
+
+    print("Step 2: Enter the target sum for each colour.\n")
+    colour_sums = []
+    for i, label in enumerate(['A', 'B', 'C'], start=1):
+        while True:
+            try:
+                s = int(input(f"  Target sum for colour {label}: ").strip())
+                colour_sums.append(s)
+                break
+            except ValueError:
+                print("  Please enter a whole number.")
+
+    print()
+    print_quadrant_diagram()
+    print("Step 3: Enter the target sum for each quadrant.\n")
+    quadrant_sums = []
+    for label in ['Q1', 'Q2', 'Q3', 'Q4']:
+        while True:
+            try:
+                s = int(input(f"  Target sum for {label}: ").strip())
+                quadrant_sums.append(s)
+                break
+            except ValueError:
+                print("  Please enter a whole number.")
+
+    return colour_map[1], colour_map[2], colour_map[3], colour_sums, quadrant_sums
+
+
+colour_1_cells, colour_2_cells, colour_3_cells, colour_sums, quadrant_sums = get_inputs()
+
+suko = Suko(colour_1_cells, colour_2_cells, colour_3_cells, colour_sums, quadrant_sums)
 suko.solve_problem()
